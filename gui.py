@@ -177,11 +177,16 @@ class main(QtWidgets.QMainWindow):
         self.plotdata = np.zeros((length, len(self.channels)))
 
     def update_sample_rate(self, value):
-        self.samplerate = int(value)
-        sd.default.samplerate = self.samplerate
-        length = int(self.window_length * self.samplerate / (1000 * self.downsample))
-        print(self.samplerate, sd.default.samplerate)
-        self.plotdata = np.zeros((length, len(self.channels)))
+        try:
+            self.samplerate = int(value)
+            sd.default.samplerate = self.samplerate
+            length = int(
+                self.window_length * self.samplerate / (1000 * self.downsample)
+            )
+            print(self.samplerate, sd.default.samplerate)
+            self.plotdata = np.zeros((length, len(self.channels)))
+        except:
+            pass
 
     def update_down_sample(self, value):
         self.downsample = int(value)
