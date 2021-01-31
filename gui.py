@@ -15,8 +15,8 @@ from PyQt5.QtCore import pyqtSlot
 from PyQt5.QtMultimedia import QAudioDeviceInfo, QAudio, QCameraInfo
 import time
 
-input_audio_deviceInfos = QAudioDeviceInfo.availableDevices(QAudio.AudioInput)
 
+input_audio_deviceInfos = QAudioDeviceInfo.availableDevices(QAudio.AudioInput)
 
 class MplCanvas(FigureCanvas):
     def __init__(self, parent=None, width=5, height=4, dpi=100):
@@ -54,20 +54,38 @@ class main(QtWidgets.QMainWindow):
         self.reference_plot = None
         self.q = queue.Queue(maxsize=20)
 
-        self.device = 0
         self.window_length = 1000
         self.downsample = 1
         self.channels = [1]
         self.interval = 30
         self.yrangeMinVal = -0.5
         self.yrangeMaxVal = 0.5
+        # self.all_devices = list(sd.query_devices())
+        # print(len(self.all_devices))
+        self.device_success = 0
+        for self.device in range(len(input_audio_deviceInfos)):
+            try:
+                device_info = sd.query_devices(self.device, "input")
+                if device_info:
+                    self.device_success = 1
+                    break
+            except:
+                pass
+        if self.device_success:
+            print(device_info)
+            self.samplerate = device_info["default_samplerate"]
+            length = int(self.window_length * self.samplerate / (1000 * self.downsample))
+            sd.default.samplerate = self.samplerate
+            self.plotdata = np.zeros((length, len(self.channels)))
+        else:
+            self.disable_buttons()
+            self.pushButton_2.setEnabled(False)
+            self.pushButton_2.setStyleSheet(
+            "QPushButton" "{" "background-color : lightblue;" "}"
+            )
+            self.devices_list.append("No Devices Found")
+            self.comboBox.addItems(self.devices_list)
 
-        device_info = sd.query_devices(self.device, "input")
-        self.samplerate = device_info["default_samplerate"]
-        length = int(self.window_length * self.samplerate / (1000 * self.downsample))
-        sd.default.samplerate = self.samplerate
-
-        self.plotdata = np.zeros((length, len(self.channels)))
         self.timer = QtCore.QTimer()
         self.timer.setInterval(self.interval)  # msec
         self.timer.timeout.connect(self.update_plot)
