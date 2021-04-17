@@ -1,22 +1,26 @@
+from PyQt5.QtMultimedia import QAudioDeviceInfo, QAudio
+from PyQt5.QtCore import pyqtSlot
+from PyQt5 import uic
+from PyQt5 import QtCore, QtWidgets
+import sounddevice as sd
+import numpy as np
+import queue
+import matplotlib.ticker as ticker
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import sys
+import os
 import matplotlib
+from PyQt5.QtGui import QIcon
 
 matplotlib.use("Qt5Agg")
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.figure import Figure
-import matplotlib.ticker as ticker
-import queue
-import numpy as np
-import sounddevice as sd
-
-from PyQt5 import QtCore, QtWidgets, QtGui
-from PyQt5 import uic
-from PyQt5.QtCore import pyqtSlot
-from PyQt5.QtMultimedia import QAudioDeviceInfo, QAudio, QCameraInfo
-import time
 
 
+# uses QAudio to obtain all the available devices on the system
 input_audio_deviceInfos = QAudioDeviceInfo.availableDevices(QAudio.AudioInput)
+
+# class with all the specification for plotting the matplotlib figure
+
 
 class MplCanvas(FigureCanvas):
     def __init__(self, parent=None, width=5, height=4, dpi=100):
@@ -27,24 +31,27 @@ class MplCanvas(FigureCanvas):
         super(MplCanvas, self).__init__(fig)
         fig.tight_layout()
 
+# The main window that is called to run the application
 
-class main(QtWidgets.QMainWindow):
+
+class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         QtWidgets.QMainWindow.__init__(self)
+        # import the QT designer created ui for the application
         self.ui = uic.loadUi("main.ui", self)
-        self.resize(888, 600)
-        icon = QtGui.QIcon()
-        # icon.addPixmap(
-        #     QtGui.QPixmap("PyShine.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off
-        # )
-        self.setWindowIcon(icon)
+        self.resize(888, 600)  # reset the size
+        self.ui.setWindowTitle('Voice Plotter')
+        self.ui.setWindowIcon(QIcon(os.path.join('icons', 'sound.png')))
+
         self.threadpool = QtCore.QThreadPool()
         self.threadpool.setMaxThreadCount(1)
         self.devices_list = []
         for device in input_audio_deviceInfos:
             self.devices_list.append(device.deviceName())
 
+        # add all the available device name to the combo box
         self.comboBox.addItems(self.devices_list)
+        # when the combobox selection changes run the function update_now
         self.comboBox.currentIndexChanged["QString"].connect(self.update_now)
         self.comboBox.setCurrentIndex(0)
 
@@ -54,10 +61,11 @@ class main(QtWidgets.QMainWindow):
         self.reference_plot = None
         self.q = queue.Queue(maxsize=20)
 
-        self.window_length = 1000
-        self.downsample = 1
+        # plot specifications
+        self.window_length = 1000  # for obtaining sound
+        self.downsample = 1  # for obtaining sound
         self.channels = [1]
-        self.interval = 30
+        self.interval = 30  # update plot every 30/1000 second
         self.yrangeMinVal = -0.5
         self.yrangeMaxVal = 0.5
         # self.all_devices = list(sd.query_devices())
@@ -71,17 +79,18 @@ class main(QtWidgets.QMainWindow):
                     break
             except:
                 pass
-        if self.device_success:
-            print(device_info)
+        if self.device_success:  # run if the device connection is successful
+            # print(device_info)
             self.samplerate = device_info["default_samplerate"]
-            length = int(self.window_length * self.samplerate / (1000 * self.downsample))
+            length = int(self.window_length * self.samplerate /
+                         (1000 * self.downsample))
             sd.default.samplerate = self.samplerate
             self.plotdata = np.zeros((length, len(self.channels)))
         else:
             self.disable_buttons()
             self.pushButton_2.setEnabled(False)
             self.pushButton_2.setStyleSheet(
-            "QPushButton" "{" "background-color : lightblue;" "}"
+                "QPushButton" "{" "background-color : lightblue;" "}"
             )
             self.devices_list.append("No Devices Found")
             self.comboBox.addItems(self.devices_list)
@@ -93,11 +102,13 @@ class main(QtWidgets.QMainWindow):
         self.data = [0]
         self.lineEdit.textChanged["QString"].connect(self.update_window_length)
         self.lineEdit_2.textChanged.connect(self.update_sample_rate)
-        self.spinBox_downsample.valueChanged.connect(self.update_down_sample)  #####
+        self.spinBox_downsample.valueChanged.connect(self.update_down_sample)
         self.spinBox_updateInterval.valueChanged.connect(self.update_interval)
 
-        self.doubleSpinBox_yrangemin.valueChanged.connect(self.update_yrange_min)
-        self.doubleSpinBox_yrangemax.valueChanged.connect(self.update_yrange_max)
+        self.doubleSpinBox_yrangemin.valueChanged.connect(
+            self.update_yrange_min)  # change the yminvalues when the Yrange is changed
+        self.doubleSpinBox_yrangemax.valueChanged.connect(
+            self.update_yrange_max)
 
         self.pushButton.clicked.connect(self.start_worker)
         self.pushButton_2.clicked.connect(self.stop_worker)
@@ -110,7 +121,7 @@ class main(QtWidgets.QMainWindow):
 
             def audio_callback(indata, frames, time, status):
                 self.q.put(indata[:: self.downsample, [0]])
-
+            # uses sounddevice to obtain the input stream, check the InputStream for details
             stream = sd.InputStream(
                 device=self.device,
                 channels=max(self.channels),
@@ -191,7 +202,8 @@ class main(QtWidgets.QMainWindow):
 
     def update_window_length(self, value):
         self.window_length = int(value)
-        length = int(self.window_length * self.samplerate / (1000 * self.downsample))
+        length = int(self.window_length * self.samplerate /
+                     (1000 * self.downsample))
         self.plotdata = np.zeros((length, len(self.channels)))
 
     def update_sample_rate(self, value):
@@ -208,7 +220,8 @@ class main(QtWidgets.QMainWindow):
 
     def update_down_sample(self, value):
         self.downsample = int(value)
-        length = int(self.window_length * self.samplerate / (1000 * self.downsample))
+        length = int(self.window_length * self.samplerate /
+                     (1000 * self.downsample))
         self.plotdata = np.zeros((length, len(self.channels)))
 
     def update_interval(self, value):
@@ -223,7 +236,7 @@ class main(QtWidgets.QMainWindow):
     def update_plot(self):
         try:
 
-            print("ACTIVE THREADS:", self.threadpool.activeThreadCount(), end=" \r")
+            # print("ACTIVE THREADS:", self.threadpool.activeThreadCount(), end=" \r")
             self.label_18.setText(f"{self.threadpool.activeThreadCount()}")
             while self.go_on is False:
                 QtWidgets.QApplication.processEvents()
@@ -240,7 +253,8 @@ class main(QtWidgets.QMainWindow):
                 self.canvas.axes.set_facecolor("#D5F9FF")
 
                 if self.reference_plot is None:
-                    plot_refs = self.canvas.axes.plot(self.ydata, color="green")
+                    plot_refs = self.canvas.axes.plot(
+                        self.ydata, color="green")
                     self.reference_plot = plot_refs[0]
                 else:
                     self.reference_plot.set_ydata(self.ydata)
@@ -251,7 +265,8 @@ class main(QtWidgets.QMainWindow):
             self.canvas.axes.yaxis.set_major_formatter(
                 ticker.FormatStrFormatter("%0.1f")
             )
-            self.canvas.axes.set_ylim(ymin=self.yrangeMinVal, ymax=self.yrangeMaxVal)
+            self.canvas.axes.set_ylim(
+                ymin=self.yrangeMinVal, ymax=self.yrangeMaxVal)
 
             self.canvas.draw()
         except Exception as e:
@@ -275,6 +290,6 @@ class Worker(QtCore.QRunnable):
 app = QtWidgets.QApplication(sys.argv)
 
 if __name__ == "__main__":
-    mainWindow = main()
+    mainWindow = MainWindow()
     mainWindow.show()
     sys.exit(app.exec_())

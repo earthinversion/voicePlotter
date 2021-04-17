@@ -1,11 +1,10 @@
-from gui import main as guiMain
-from gui import main, app
+from gui import MainWindow, app
 from PyQt5 import QtCore, QtWidgets, QtGui
 import sys
 
 
-def main(guiMain=guiMain):
-    mainWindow = guiMain()
+def main():
+    mainWindow = MainWindow()
     mainWindow.show()
     sys.exit(app.exec_())
 
